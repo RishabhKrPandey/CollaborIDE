@@ -60,7 +60,7 @@ io.on('connection', (socket)=>{
         // now user has joined or created a room 
         // need to start traking changes
         // when user join he shoild be able to see the code already present
-        socket.on('codeUpdate', rooms.get(roomID).code);
+        socket.emit('codeUpdate', rooms.get(roomID).code);
         // update all users about the new joined
         io.to(roomID).emit("userJoined", Array.from(rooms.get(roomID).users))
 
