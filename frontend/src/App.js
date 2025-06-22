@@ -4,7 +4,7 @@ import io from "socket.io-client";
 import Editor from "@monaco-editor/react";
 import { v4 as uuid } from "uuid";
 
-const socket = io("http://localhost:5000");
+const socket = io(process.env.REACT_APP_SOCKET_URL);
 
 const App = () => {
   const [joined, setJoined] = useState(false);
@@ -209,14 +209,15 @@ const App = () => {
       </div>
 
       <div className="editor-wrapper">
-        <Editor
-          height={"60%"}
-          language={language}
-          value={code}
-          onChange={handleCodeChange}
-          theme="vs-dark"
-          options={{ minimap: { enabled: false }, fontSize: 14 }}
-        />
+<div className="monaco-editor-wrapper">
+  <Editor
+    language={language}
+    value={code}
+    onChange={handleCodeChange}
+    theme="vs-dark"
+    options={{ minimap: { enabled: false }, fontSize: 14 }}
+  />
+</div>
 
         <textarea
           className="input-console"
