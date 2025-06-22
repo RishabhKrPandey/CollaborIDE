@@ -200,13 +200,13 @@ app.get("/api/load/:id", async (req, res) => {
     res.status(500).json({ error: "Invalid ID" });
   }
 });
-// serving build from frontend
-app.use(express.static(path.join(__dirname, '../frontend/build')));
+// // serving build from frontend
+// app.use(express.static(path.join(__dirname, '../frontend/build')));
 
-app.get('*', (req, res)=> {
-  res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
+// app.get('*', (req, res)=> {
+//   res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
   
-});
+// });
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
