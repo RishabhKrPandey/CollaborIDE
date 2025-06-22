@@ -10,6 +10,7 @@ const App = () => {
   const [joined, setJoined] = useState(false);
   const [roomID, setRoomID] = useState("");
   const [userName, setUserName] = useState("");
+  const [password, setPassword] = useState("");
   const [language, setLanguage] = useState("cpp");
   const [code, setCode] = useState("// start code here");
   const [copySuccess, setCopySuccess] = useState("");
@@ -20,6 +21,7 @@ const App = () => {
   const [userInput, setUserInput] = useState("");
   const [chat, setChat] = useState("");
   const [chatMessages, setChatMessages] = useState([]);
+  const [error, setError] = useState("");
 
   const languageVersionMap = {
     javascript: "18.15.0",
@@ -58,9 +60,17 @@ const App = () => {
   }, []);
 
   const joinRoom = () => {
-    if (roomID && userName) {
-      socket.emit("join", { roomID, username: userName });
-      setJoined(true);
+    if (roomID && userName && password) {
+      socket.emit("join", { roomID, username: userName, password }, (response) => {
+        if (response?.success) {
+          setJoined(true);
+          setError("");
+        } else {
+          setError(response?.error || "Failed to join room.");
+        }
+      });
+    } else {
+      setError("All fields are required.");
     }
   };
 
@@ -69,6 +79,8 @@ const App = () => {
     setJoined(false);
     setRoomID("");
     setUserName("");
+    setPassword("");
+    setError("");
     setCode("// start code here");
     setLanguage("javascript");
     setChatMessages([]);
@@ -113,7 +125,6 @@ const App = () => {
     }
   };
 
-  // ✅ NEW: Download code as file
   const downloadCode = () => {
     const extensionMap = {
       javascript: "js",
@@ -121,11 +132,9 @@ const App = () => {
       java: "java",
       cpp: "cpp",
     };
-
     const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-
     const ext = extensionMap[language] || "txt";
     a.href = url;
     a.download = `code-snippet.${ext}`;
@@ -138,6 +147,7 @@ const App = () => {
       <div className="join-container">
         <div className="join-form">
           <h1>Join Code Room</h1>
+
           <input
             type="text"
             placeholder="Room ID"
@@ -145,13 +155,24 @@ const App = () => {
             onChange={(e) => setRoomID(e.target.value)}
           />
           <button onClick={createRoomID}>Create ID</button>
+
+          <input
+            type="password"
+            placeholder="Room Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+
           <input
             type="text"
             placeholder="Your Name"
             value={userName}
             onChange={(e) => setUserName(e.target.value)}
           />
+
           <button onClick={joinRoom}>Join Room</button>
+
+          {error && <p className="error">{error}</p>}
         </div>
       </div>
     );
@@ -189,7 +210,6 @@ const App = () => {
 
       <div className="editor-wrapper">
         <Editor
-         
           height={"60%"}
           language={language}
           value={code}
