@@ -1,13 +1,13 @@
-// main server file
 const express = require("express");
 const app = express();
 require("dotenv").config();
 const connectDB = require("./config/db");
 const path = require("path");
 const Code = require("./models/Code");
-const Room = require("./models/Room"); // NEW
+const Room = require("./models/Room");
 const axios = require("axios");
 const cors = require("cors");
+const bcrypt = require("bcrypt");
 
 connectDB();
 app.use(express.json());
@@ -31,40 +31,68 @@ io.on("connection", (socket) => {
   let currentRoom = null;
   let currentUser = null;
 
-  socket.on("join", async ({ roomID, username }) => {
-    if (currentRoom) {
-      socket.leave(currentRoom);
-      const prevRoom = await Room.findOne({ roomID: currentRoom });
-      if (prevRoom) {
-        prevRoom.users = prevRoom.users.filter((u) => u !== currentUser);
-        await prevRoom.save();
-        io.to(currentRoom).emit("userJoined", prevRoom.users);
+  socket.on("join", async ({ roomID, username, password }, callback) => {
+    try {
+      // Leave previous room if already joined
+      if (currentRoom) {
+        socket.leave(currentRoom);
+        const prevRoom = await Room.findOne({ roomID: currentRoom });
+        if (prevRoom) {
+          prevRoom.users = prevRoom.users.filter((u) => u !== currentUser);
+          await prevRoom.save();
+          io.to(currentRoom).emit("userJoined", prevRoom.users);
+        }
       }
+
+      let room = await Room.findOne({ roomID });
+
+      // Room creation
+      if (!room) {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        room = new Room({
+          roomID,
+          password: hashedPassword,
+          code: "// start code here",
+          language: "javascript",
+          version: "*",
+          users: [],
+        });
+        await room.save();
+        console.log(`✅ Room created: ${roomID}`);
+      } else {
+        // Password verification
+        const isMatch = await bcrypt.compare(password, room.password);
+        if (!isMatch) {
+          if (callback) callback({ success: false, error: "Incorrect password" });
+          return;
+        }
+      }
+
+      currentRoom = roomID;
+      currentUser = username;
+      socket.join(roomID);
+
+      if (!room.users.includes(username)) {
+        room.users.push(username);
+        await room.save();
+      }
+
+      rooms.set(roomID, {
+        users: new Set(room.users),
+        code: room.code,
+        language: room.language,
+        version: room.version,
+      });
+
+      socket.emit("codeUpdate", room.code);
+      io.to(roomID).emit("userJoined", room.users);
+
+      if (callback) callback({ success: true });
+
+    } catch (error) {
+      console.error("Join error:", error);
+      if (callback) callback({ success: false, error: "Server error while joining" });
     }
-
-    currentRoom = roomID;
-    currentUser = username;
-    socket.join(roomID);
-
-    let room = await Room.findOne({ roomID });
-    if (!room) {
-      room = new Room({ roomID, code: "// start code here", language: "javascript", version: "*", users: [] });
-    }
-
-    if (!room.users.includes(username)) {
-      room.users.push(username);
-    }
-    await room.save();
-
-    rooms.set(roomID, {
-      users: new Set(room.users),
-      code: room.code,
-      language: room.language,
-      version: room.version,
-    });
-
-    socket.emit("codeUpdate", room.code);
-    io.to(roomID).emit("userJoined", room.users);
   });
 
   socket.on("codeChange", async ({ roomID, code }) => {
@@ -98,14 +126,19 @@ io.on("connection", (socket) => {
   });
 
   socket.on("compileCode", async ({ roomID, code, language, version, input }) => {
-    if (rooms.has(roomID)) {
-      const response = await axios.post("https://emkc.org/api/v2/piston/execute", {
-        language,
-        version,
-        files: [{ content: code }],
-        stdin: input,
-      });
-      io.to(roomID).emit("codeResponse", response.data);
+    try {
+      if (rooms.has(roomID)) {
+        const response = await axios.post("https://emkc.org/api/v2/piston/execute", {
+          language,
+          version,
+          files: [{ content: code }],
+          stdin: input,
+        });
+        io.to(roomID).emit("codeResponse", response.data);
+      }
+    } catch (err) {
+      console.error("Code compilation error:", err);
+      io.to(roomID).emit("codeResponse", { run: { output: "Error compiling code." } });
     }
   });
 
@@ -145,7 +178,7 @@ io.on("connection", (socket) => {
         }
         io.to(currentRoom).emit("userJoined", room.users);
       }
-      console.log("User disconnected");
+      console.log("User disconnected:", currentUser);
     }
   });
 });
