@@ -10,7 +10,7 @@ const App = () => {
   const [joined, setJoined] = useState(false);
   const [roomID, setRoomID] = useState("");
   const [userName, setUserName] = useState("");
-  const [language, setLanguage] = useState("javascript");
+  const [language, setLanguage] = useState("cpp");
   const [code, setCode] = useState("// start code here");
   const [copySuccess, setCopySuccess] = useState("");
   const [users, setUsers] = useState([]);
@@ -183,7 +183,7 @@ const App = () => {
           Leave Room
         </button>
         <button onClick={downloadCode} className="save-button">
-          Download Code
+          Save Code
         </button>
       </div>
 

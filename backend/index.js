@@ -1,153 +1,156 @@
 // main server file
-const express = require('express')
+const express = require("express");
 const app = express();
-require('dotenv').config();
-const connectDB = require('./config/db')
-const path = require('path')
-const Code = require('./models/Code')
-const axios = require('axios');
-const cors = require('cors')
+require("dotenv").config();
+const connectDB = require("./config/db");
+const path = require("path");
+const Code = require("./models/Code");
+const Room = require("./models/Room"); // NEW
+const axios = require("axios");
+const cors = require("cors");
 
-
-// set up database for chat and code storage feature
 connectDB();
-app.use(express.json());
-const http = require('http');
-const server = http.createServer(app);
 app.use(express.json());
 app.use(cors());
 
-const { Server } = require('socket.io');
+const http = require("http");
+const server = http.createServer(app);
+const { Server } = require("socket.io");
 
-
-const io = new Server(server,{
-    cors : {
-        origin :"*",
-    },
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+  },
 });
 
-// create a room  to handle users in room
-const rooms = new Map()
+const rooms = new Map();
 
-io.on('connection', (socket)=>{
-    console.log('User Connected', socket.id);
+io.on("connection", (socket) => {
+  console.log("User Connected", socket.id);
 
-    let currentRoom = null;
-    let currentUser = null;
+  let currentRoom = null;
+  let currentUser = null;
 
-    // we will track users and room
-    // now if user joins a room , check if he is curretly joined in any room leave that room
-    // gneerate 2 this room_id and username for the user
-    socket.on('join', ({roomID, username}) =>{
-        if(currentRoom){
-            socket.leave(currentRoom);
-            rooms.get(currentRoom)?.users.delete(currentUser);
-            // if users not available it will create one {room1 : {users:{1,2,3}}} , data will be something like this
+  socket.on("join", async ({ roomID, username }) => {
+    if (currentRoom) {
+      socket.leave(currentRoom);
+      const prevRoom = await Room.findOne({ roomID: currentRoom });
+      if (prevRoom) {
+        prevRoom.users = prevRoom.users.filter((u) => u !== currentUser);
+        await prevRoom.save();
+        io.to(currentRoom).emit("userJoined", prevRoom.users);
+      }
+    }
 
-            // make user join the newromm
-            io.to(currentRoom).emit("userJoined", Array.from(rooms.get(currentRoom).users));
-            
+    currentRoom = roomID;
+    currentUser = username;
+    socket.join(roomID);
 
+    let room = await Room.findOne({ roomID });
+    if (!room) {
+      room = new Room({ roomID, code: "// start code here", language: "javascript", version: "*", users: [] });
+    }
+
+    if (!room.users.includes(username)) {
+      room.users.push(username);
+    }
+    await room.save();
+
+    rooms.set(roomID, {
+      users: new Set(room.users),
+      code: room.code,
+      language: room.language,
+      version: room.version,
+    });
+
+    socket.emit("codeUpdate", room.code);
+    io.to(roomID).emit("userJoined", room.users);
+  });
+
+  socket.on("codeChange", async ({ roomID, code }) => {
+    if (rooms.has(roomID)) {
+      rooms.get(roomID).code = code;
+      const room = await Room.findOne({ roomID });
+      if (room) {
+        room.code = code;
+        await room.save();
+      }
+    }
+    socket.to(roomID).emit("codeUpdate", code);
+  });
+
+  socket.on("typing", ({ roomID, username }) => {
+    socket.to(roomID).emit("userTyping", username);
+  });
+
+  socket.on("languageChange", async ({ roomID, language, version }) => {
+    if (rooms.has(roomID)) {
+      rooms.get(roomID).language = language;
+      rooms.get(roomID).version = version;
+    }
+    const room = await Room.findOne({ roomID });
+    if (room) {
+      room.language = language;
+      room.version = version;
+      await room.save();
+    }
+    io.to(roomID).emit("languageUpdate", language);
+  });
+
+  socket.on("compileCode", async ({ roomID, code, language, version, input }) => {
+    if (rooms.has(roomID)) {
+      const response = await axios.post("https://emkc.org/api/v2/piston/execute", {
+        language,
+        version,
+        files: [{ content: code }],
+        stdin: input,
+      });
+      io.to(roomID).emit("codeResponse", response.data);
+    }
+  });
+
+  socket.on("chatMessage", ({ roomID, username, message }) => {
+    io.to(roomID).emit("newChatMessage", { username, message });
+  });
+
+  socket.on("leaveRoom", async () => {
+    if (currentRoom && currentUser) {
+      const room = await Room.findOne({ roomID: currentRoom });
+      if (room) {
+        room.users = room.users.filter((u) => u !== currentUser);
+        if (room.users.length === 0) {
+          await Room.deleteOne({ roomID: currentRoom });
+          rooms.delete(currentRoom);
+        } else {
+          await room.save();
         }
-        // if room is yet not created, then create it
-        currentRoom = roomID;
-        currentUser = username;
-        // check if room exist or create a new one
-        socket.join(roomID);
+        io.to(currentRoom).emit("userJoined", room.users);
+      }
+      socket.leave(currentRoom);
+      currentRoom = null;
+      currentUser = null;
+    }
+  });
 
-        if (!rooms.has(roomID)) {
-        rooms.set(roomID, { users: new Set(), code: "// start code here" });
+  socket.on("disconnect", async () => {
+    if (currentRoom && currentUser) {
+      const room = await Room.findOne({ roomID: currentRoom });
+      if (room) {
+        room.users = room.users.filter((u) => u !== currentUser);
+        if (room.users.length === 0) {
+          await Room.deleteOne({ roomID: currentRoom });
+          rooms.delete(currentRoom);
+        } else {
+          await room.save();
         }
-
-        rooms.get(roomID).users.add(username);
-
-        // now user has joined or created a room 
-        // need to start traking changes
-        // when user join he shoild be able to see the code already present
-        socket.emit('codeUpdate', rooms.get(roomID).code);
-        
-        // update all users about the new joined
-        io.to(roomID).emit("userJoined", Array.from(rooms.get(roomID).users))
-
-
-    });
-    // now for all users present in room 
-    socket.on('codeChange', ({roomID, code}) =>{
-        if(rooms.get(roomID)){
-            rooms.get(roomID).code = code;
-        }
-        
-        // send updated code to each member
-        socket.to(roomID).emit('codeUpdate', code);
-    });
-    // whenver user types , tell other users
-     socket.on("typing", ({ roomID, username }) => {
-     socket.to(roomID).emit("userTyping", username);
-    });
-
-    // if user changes programming language do it for all
-    socket.on('languageChange', ({roomID, language, version})=>{
-        // change for all users
-        io.to(roomID).emit('languageUpdate', language);
-        rooms.get(roomID).version = version;
-    });
-
-    //we will use piston api for compiling our code
-    socket.on('compileCode', async({roomID, code, language, version, input})=>{
-        // use axios for api request
-        // handle this task asynchronously
-        if(rooms.has(roomID)){
-            const response = await axios.post("https://emkc.org/api/v2/piston/execute", {
-                language,
-                version,
-                files : [{content : code}],
-                stdin : input,
-            });
-            // send response to all the users
-            io.to(roomID).emit('codeResponse', response.data);
-
-        }
-    });
-
-    // for chat message
-    socket.on('chatMessage', ({roomID, username, message})=>{
-        // emit this message to everyone
-        io.to(roomID).emit('newChatMessage', {username, message});
-    })
-
-    //handle if user leaves the room - set current details to null and deletefrom room
-    // if disconnect - just delete the user from room , dont remove the details
-    socket.on('disconnect', ()=>{
-        if(currentRoom && currentUser){
-            rooms.get(currentRoom).users.delete(currentUser);
-            // update the list
-            io.to(currentRoom).emit("userJoined", Array.from(rooms.get(currentRoom).users));
-            
-
-        }
-        console.log("User disconnected");
-    });
-    socket.on('leaveRoom', ()=>{
-        if(currentRoom && currentUser){
-            rooms.get(currentRoom).users.delete(currentUser);
-            // update the list
-            io.to(currentRoom).emit("userJoined", Array.from(rooms.get(currentRoom).users));
-            socket.leave(currentRoom);
-            currentRoom = null;
-            currentUser = null;
-            
-
-        }
-
-    });
-
-
-
-
+        io.to(currentRoom).emit("userJoined", room.users);
+      }
+      console.log("User disconnected");
+    }
+  });
 });
 
-// we aslo need to save the code
-// generate id and send it as response which will be used to load the code again
+// Save and load code snippets
 app.post("/api/save", async (req, res) => {
   const { code, language, version } = req.body;
   const newCode = new Code({ code, language, version });
@@ -155,7 +158,6 @@ app.post("/api/save", async (req, res) => {
   res.json({ id: saved._id });
 });
 
-// for loading
 app.get("/api/load/:id", async (req, res) => {
   try {
     const snippet = await Code.findById(req.params.id);
@@ -170,4 +172,3 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
-

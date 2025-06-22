@@ -121,7 +121,7 @@ body {
 
 .language-selector,
 .leave-button,
-.download-button {
+.save-button {
   margin-top: 1rem;
   width: 100%;
   padding: 0.6rem;
@@ -145,13 +145,13 @@ body {
   background-color: #b71c1c;
 }
 
-.download-button {
+.save-button {
   background-color: #4caf50;
   color: white;
   margin-top: 0.5rem;
 }
 
-.download-button:hover {
+.save-button:hover {
   background-color: #388e3c;
 }
 
