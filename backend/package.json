@@ -3,14 +3,12 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js"
-
   },
   "keywords": [],
-  "author": "",
+  "author": "Rishabh Kumar Pandey",
   "license": "ISC",
-  "description": "",
+  "description": "Collaborative Code Editor Backend",
   "dependencies": {
     "axios": "^1.10.0",
     "bcrypt": "^6.0.0",
@@ -18,7 +16,6 @@
     "dotenv": "^16.5.0",
     "express": "^4.21.2",
     "mongoose": "^8.16.0",
-    "path": "^0.12.7",
     "socket.io": "^4.8.1",
     "uuid": "^11.1.0",
     "websocket": "^1.0.35"
