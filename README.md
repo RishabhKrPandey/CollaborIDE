@@ -20,6 +20,7 @@
 ---
 
 ## 🖼️ Demo Preview
+![9babdbb4-da2e-4de0-9d84-6420710c1fa7](https://github.com/user-attachments/assets/a9c57ece-79eb-467e-93ae-baa00e87cbeb)
 
 ![Preview](https://github.com/RishabhKrPandey/CollaborIDE/raw/main/demo.gif) <!-- Add your demo.gif here if available -->
 
