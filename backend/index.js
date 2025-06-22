@@ -5,6 +5,8 @@ require('dotenv').config();
 const connectDB = require('./config/db')
 const path = require('path')
 const Code = require('./models/Code')
+const axios = require('axios');
+
 
 // set up database for chat and code storage feature
 connectDB();
@@ -61,6 +63,7 @@ io.on('connection', (socket)=>{
         // need to start traking changes
         // when user join he shoild be able to see the code already present
         socket.emit('codeUpdate', rooms.get(roomID).code);
+        
         // update all users about the new joined
         io.to(roomID).emit("userJoined", Array.from(rooms.get(roomID).users))
 
@@ -81,9 +84,10 @@ io.on('connection', (socket)=>{
     });
 
     // if user changes programming language do it for all
-    socket.on('languageChange', ({roomID, language})=>{
+    socket.on('languageChange', ({roomID, language, version})=>{
         // change for all users
         io.to(roomID).emit('languageUpdate', language);
+        rooms.get(roomID).version = version;
     });
 
     //we will use piston api for compiling our code
@@ -143,7 +147,7 @@ io.on('connection', (socket)=>{
 // we aslo need to save the code
 // generate id and send it as response which will be used to load the code again
 app.post("/api/save", async (req, res) => {
-  const { code, language } = req.body;
+  const { code, language, version } = req.body;
   const newCode = new Code({ code, language });
   const saved = await newCode.save();
   res.json({ id: saved._id });
@@ -160,4 +164,8 @@ app.get("/api/load/:id", async (req, res) => {
   }
 });
 
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+});
 
