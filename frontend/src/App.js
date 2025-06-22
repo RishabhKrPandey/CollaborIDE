@@ -3,7 +3,6 @@ import "./App.css";
 import io from "socket.io-client";
 import Editor from "@monaco-editor/react";
 import { v4 as uuid } from "uuid";
-import axios from "axios";
 
 const socket = io("http://localhost:5000");
 
@@ -21,17 +20,14 @@ const App = () => {
   const [userInput, setUserInput] = useState("");
   const [chat, setChat] = useState("");
   const [chatMessages, setChatMessages] = useState([]);
-  const [loadID, setLoadID] = useState("");
-  const [saveLink, setSaveLink] = useState("");
 
   const languageVersionMap = {
-  javascript: "18.15.0",  
-  python: "3.10.0",
-  java: "15.0.2",
-  cpp: "10.2.0"
-};
+    javascript: "18.15.0",
+    python: "3.10.0",
+    java: "15.0.2",
+    cpp: "10.2.0",
+  };
 
-  // Socket listeners
   useEffect(() => {
     socket.on("userJoined", (users) => setUsers(users));
     socket.on("codeUpdate", (newCode) => setCode(newCode));
@@ -117,27 +113,24 @@ const App = () => {
     }
   };
 
-  const saveCode = async () => {
-    try {
-      const { data } = await axios.post("http://localhost:5000/api/save", {
-        code,
-        language,
-        version,
-      });
-      setSaveLink(`Code saved! ID: ${data.id}`);
-    } catch {
-      setSaveLink("Failed to save code.");
-    }
-  };
+  // ✅ NEW: Download code as file
+  const downloadCode = () => {
+    const extensionMap = {
+      javascript: "js",
+      python: "py",
+      java: "java",
+      cpp: "cpp",
+    };
 
-  const loadCode = async () => {
-    try {
-      const { data } = await axios.get(`http://localhost:5000/api/load/${loadID}`);
-      setCode(data.code);
-      setLanguage(data.language);
-    } catch {
-      alert("Error loading code. Check your ID.");
-    }
+    const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+
+    const ext = extensionMap[language] || "txt";
+    a.href = url;
+    a.download = `code-snippet.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (!joined) {
@@ -159,14 +152,6 @@ const App = () => {
             onChange={(e) => setUserName(e.target.value)}
           />
           <button onClick={joinRoom}>Join Room</button>
-          <hr />
-          <input
-            type="text"
-            placeholder="Paste code ID to load"
-            value={loadID}
-            onChange={(e) => setLoadID(e.target.value)}
-          />
-          <button onClick={loadCode}>Load Code</button>
         </div>
       </div>
     );
@@ -177,7 +162,9 @@ const App = () => {
       <div className="sidebar">
         <div className="room-info">
           <h2>Room: {roomID}</h2>
-          <button onClick={copyRoomId} className="copy-button">Copy ID</button>
+          <button onClick={copyRoomId} className="copy-button">
+            Copy ID
+          </button>
           {copySuccess && <span className="copy-success">{copySuccess}</span>}
         </div>
 
@@ -192,15 +179,18 @@ const App = () => {
           <option value="cpp">C++</option>
         </select>
 
-        <button className="leave-button" onClick={leaveRoom}>Leave Room</button>
-        <button onClick={saveCode} className="save-button">Save Code</button>
-        {saveLink && <p style={{ fontSize: "0.8rem" }}>{saveLink}</p>}
+        <button className="leave-button" onClick={leaveRoom}>
+          Leave Room
+        </button>
+        <button onClick={downloadCode} className="save-button">
+          Download Code
+        </button>
       </div>
 
       <div className="editor-wrapper">
         <Editor
+         
           height={"60%"}
-          defaultLanguage={language}
           language={language}
           value={code}
           onChange={handleCodeChange}
@@ -214,7 +204,9 @@ const App = () => {
           onChange={(e) => setUserInput(e.target.value)}
           placeholder="Enter input here..."
         />
-        <button className="run-btn" onClick={runCode}>Execute</button>
+        <button className="run-btn" onClick={runCode}>
+          Execute
+        </button>
         <textarea
           className="output-console"
           value={outPut}
@@ -226,7 +218,9 @@ const App = () => {
           <h4>Chat</h4>
           <div className="chat-box">
             {chatMessages.map((msg, i) => (
-              <p key={i}><strong>{msg.username}:</strong> {msg.message}</p>
+              <p key={i}>
+                <strong>{msg.username}:</strong> {msg.message}
+              </p>
             ))}
           </div>
           <input

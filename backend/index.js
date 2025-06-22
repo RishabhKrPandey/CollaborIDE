@@ -6,14 +6,16 @@ const connectDB = require('./config/db')
 const path = require('path')
 const Code = require('./models/Code')
 const axios = require('axios');
+const cors = require('cors')
 
 
 // set up database for chat and code storage feature
 connectDB();
-
+app.use(express.json());
 const http = require('http');
 const server = http.createServer(app);
 app.use(express.json());
+app.use(cors());
 
 const { Server } = require('socket.io');
 
@@ -148,7 +150,7 @@ io.on('connection', (socket)=>{
 // generate id and send it as response which will be used to load the code again
 app.post("/api/save", async (req, res) => {
   const { code, language, version } = req.body;
-  const newCode = new Code({ code, language });
+  const newCode = new Code({ code, language, version });
   const saved = await newCode.save();
   res.json({ id: saved._id });
 });
