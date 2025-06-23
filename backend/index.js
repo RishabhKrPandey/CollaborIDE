@@ -19,7 +19,7 @@ const { Server } = require("socket.io");
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000", // <-- frontend origin
+    origin: "https://collaboride-production.up.railway.app",
     methods: ["GET", "POST"],
     credentials: true
   }
