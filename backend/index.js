@@ -19,8 +19,10 @@ const { Server } = require("socket.io");
 
 const io = new Server(server, {
   cors: {
-    origin: "*",
-  },
+    origin: "http://localhost:3000", // <-- frontend origin
+    methods: ["GET", "POST"],
+    credentials: true
+  }
 });
 
 const rooms = new Map();
