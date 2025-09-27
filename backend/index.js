@@ -19,7 +19,7 @@ const { Server } = require("socket.io");
 
 const io = new Server(server, {
   cors: {
-    origin: "https://collaboride-production.up.railway.app",
+    origin: "https://collaboride-3.onrender.com",
     methods: ["GET", "POST"],
     credentials: true
   }
